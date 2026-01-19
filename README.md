@@ -1,5 +1,5 @@
 # 💫 About Me:
-💀🥒DevOps fuck engineer<br>🖕🍌Machine learning engineer<br>🍆😫Permanent linux user<br>🤝💦Also permanent virgin<br>😳🏳️‍🌈Was distrohopping 3 years straight<br>👉👌Male<br>🇷🇺🔞Russian hacker
+💀🥒Goofy experimenter<br>🖕🍌Learning machine learning<br>🍆😫Permanent linux user<br>🤝💦Also permanent virgin<br>😳🏳️‍🌈Was distrohopping 3 years straight<br>👉👌Male<br>🇷🇺🔞Russian hacker
 
 
 ## 🌐 Socials:
