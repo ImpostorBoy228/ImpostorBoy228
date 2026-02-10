@@ -1,5 +1,5 @@
 # 😈 About Me:
-💀🥒Goofy experimenter<br>🖕🍌Learning machine learning<br>🍆😫Permanent linux user<br>🤝💦Also permanent virgin<br>😳🏳️‍🌈Was distrohopping 3 years straight<br>👉👌Male<br>🇷🇺🔞Russian hacker
+<br>💀🥒Goofy experimenter<br>🔪🪟Permanent linux user<br>🤝💦Also permanent virgin<br>🏳️‍⚧️🏳️‍🌈Was distrohopping 3 years straight<br>♂️😳Male<br>🇷🇺🔞Russian hacker
 
 
 # 🌐 Socials:
