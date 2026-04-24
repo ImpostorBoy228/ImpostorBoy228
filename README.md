@@ -1,5 +1,6 @@
 # 😈 About Me:
 <br>💀🥒Goofy experimenter<br>🔪🪟Permanent linux user<br>🤝💦Also permanent virgin<br>🏳️‍⚧️🏳️‍🌈Was distrohopping 3 years straight<br>♂️😳Male<br>🇷🇺🔞Russian hacker
+
 *Certain repos contain ai code. Now I'm learning how to write decent code myself*
 
 # 🌐 Socials:
