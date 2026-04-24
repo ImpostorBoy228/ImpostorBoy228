@@ -1,6 +1,6 @@
 # 😈 About Me:
 <br>💀🥒Goofy experimenter<br>🔪🪟Permanent linux user<br>🤝💦Also permanent virgin<br>🏳️‍⚧️🏳️‍🌈Was distrohopping 3 years straight<br>♂️😳Male<br>🇷🇺🔞Russian hacker
-
+*Certain repos contain ai code. Now I'm learning how to write decent code myself*
 
 # 🌐 Socials:
 [![Discord](https://img.shields.io/badge/Discord-%237289DA.svg?logo=discord&logoColor=white)](https://discord.gg/ ) [![X](https://img.shields.io/badge/X-black.svg?logo=X&logoColor=white)](https://x.com/ImpostorBoy228) [![email](https://img.shields.io/badge/Email-D14836?logo=gmail&logoColor=white)](mailto:impostorboy@yandex.ru) [![Reddit](https://img.shields.io/badge/Reddit-%23FF4500.svg?logo=Reddit&logoColor=white)](https://reddit.com/user/ImpoBoy228)
