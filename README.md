@@ -12,3 +12,5 @@
 
 
 ![GitHub Stats](https://github-stats-alpha.vercel.app/api?username=ImpostorBoy228&cc=000&tc=fff&ic=fff&bc=000)
+![GitHub Streak](https://streak-stats.demolab.com?user=ImpostorBoy228&theme=radical) 
+![Top Langs](https://github-readme-stats.vercel.app/api/top-langs/?username=ImpostorBoy228&layout=compact&theme=radical) 
