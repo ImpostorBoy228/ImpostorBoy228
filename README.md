@@ -12,4 +12,3 @@
 
 
 ![GitHub Stats](https://github-stats-alpha.vercel.app/api?username=ImpostorBoy228&cc=000&tc=fff&ic=fff&bc=000)
-![GitHub Stats](https://your-vercel-app.vercel.app/api?username=ImpostorBoy228&show_icons=true)
