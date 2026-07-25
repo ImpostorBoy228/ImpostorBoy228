@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ImpostorBoy</title>
+</head>
+<body>
+	<nav>
+	<a href=/>Main</a> <a href="/projects.html">All projects</a> <a href="https://github.com/ImpostorBoy228">Github</a> <a href="/ass.html">Asshole communication</a>
+	</nav>
+    <h2>Asshole Communication</h2>
+    <div id="messages" class="messages"></div>
+    <form id="messageForm">
+        <input type="text" id="blud" placeholder="blud">
+        <input type="text" id="lol" placeholder="message" required>
+        <button type="submit" id="bruh">Let's dance, baby</button>
+    </form>
+    <script>
+function formatITS(ns) {
+    const totalNs = BigInt(ns);
+    const Y = BigInt(147) * BigInt(86400) * BigInt(1000000000);
+    const M = BigInt(21) * BigInt(86400) * BigInt(1000000000);
+    const D = BigInt(86400) * BigInt(1000000000);
+    const H = BigInt(3600) * BigInt(1000000000);
+    const m = BigInt(60) * BigInt(1000000000);
+    let r = totalNs;
+    const y = r / Y; r %= Y;
+    const mo = r / M; r %= M;
+    const d = r / D; r %= D;
+    const h = r / H; r %= H;
+    const mi = r / m; r %= m;
+    const s = Number(r) / 1e9;
+    return `${y}y ${mo}m ${d}d ${String(h).padStart(2,'0')}:${String(mi).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+
+async function loadMessages() {
+    const res = await fetch('/api/diddy_chat');
+    const messages = await res.json();
+    document.getElementById('messages').innerHTML = messages.map(m =>
+        `<div><b>${m.blud || '???'}:</b> ${m.lol} <small style="color: #8c8c8c;">${formatITS(m.time).slice(0, -10)}</small></div>`
+    ).join('');
+}
+
+document.getElementById('messageForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    await fetch('/api/diddy_chat', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({blud: document.getElementById('blud').value, lol: document.getElementById('lol').value})
+    });
+    document.getElementById('lol').value = '';
+    loadMessages();
+});
+
+loadMessages();
+</script>
+</body>
+</html>

@@ -1,0 +1,4 @@
+User-agent: *
+Disallow:
+
+# I don't fucking care.
