@@ -115,7 +115,7 @@ func main() {
 	}
 	http.Handle("/", http.FileServer(http.FS(sub)))
 
-	log.Fatal(http.ListenAndServe(":911", nil))
+	log.Fatal(http.ListenAndServe("127.0.0.1:911", nil))
 }
 
 func handleMessages(db* sql.DB) http.HandlerFunc {
