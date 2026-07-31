@@ -8,9 +8,12 @@ import (
 	"io/fs"
 	"log"
 	"math/big"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
+	"sync"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -119,6 +122,8 @@ func main() {
 }
 
 func handleMessages(db* sql.DB) http.HandlerFunc {
+	rl := newRateLimiter(5, time.Minute)
+
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 
@@ -147,6 +152,12 @@ func handleMessages(db* sql.DB) http.HandlerFunc {
 			json.NewEncoder(w).Encode(entries)
 
 		case http.MethodPost:
+			if !rl.allow(clientIP(r)) {
+				http.Error(w, "chill out", http.StatusTooManyRequests)
+				return
+			}
+
+			r.Body = http.MaxBytesReader(w, r.Body, 4096)
 			var e Entry
 			if err := json.NewDecoder(r.Body).Decode(&e); err != nil {
 				http.Error(w, "Invalid JSON", http.StatusBadRequest)
@@ -155,6 +166,11 @@ func handleMessages(db* sql.DB) http.HandlerFunc {
 
 			if e.Lol == "" {
 				http.Error(w, "uh nuh", http.StatusBadRequest)
+				return
+			}
+
+			if len(e.Blud) > 1000 || len(e.Lol) > 1000 {
+				http.Error(w, "too long", http.StatusBadRequest)
 				return
 			}
 
@@ -171,5 +187,56 @@ func handleMessages(db* sql.DB) http.HandlerFunc {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		}
 	}
+}
+
+type rateLimiter struct {
+	mu       sync.Mutex
+	limit    int
+	window   time.Duration
+	requests map[string][]time.Time
+}
+
+func newRateLimiter(limit int, window time.Duration) *rateLimiter {
+	return &rateLimiter{
+		limit:    limit,
+		window:   window,
+		requests: make(map[string][]time.Time),
+	}
+}
+
+func (rl *rateLimiter) allow(ip string) bool {
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+
+	now := time.Now()
+	cutoff := now.Add(-rl.window)
+	ts := rl.requests[ip]
+
+	i := 0
+	for i < len(ts) && ts[i].Before(cutoff) {
+		i++
+	}
+	ts = ts[i:]
+
+	if len(ts) >= rl.limit {
+		rl.requests[ip] = ts
+		return false
+	}
+
+	rl.requests[ip] = append(ts, now)
+	return true
+}
+
+func clientIP(r *http.Request) string {
+	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+		if i := strings.IndexByte(xff, ','); i != -1 {
+			return strings.TrimSpace(xff[:i])
+		}
+		return strings.TrimSpace(xff)
+	}
+	if host, _, err := net.SplitHostPort(r.RemoteAddr); err == nil {
+		return host
+	}
+	return r.RemoteAddr
 }
 

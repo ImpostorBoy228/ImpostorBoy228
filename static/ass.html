@@ -37,9 +37,21 @@ function formatITS(ns) {
 async function loadMessages() {
     const res = await fetch('/api/diddy_chat');
     const messages = await res.json();
-    document.getElementById('messages').innerHTML = messages.map(m =>
-        `<div><b>${m.blud || '???'}:</b> ${m.lol} <small style="color: #8c8c8c;">${formatITS(m.time).slice(0, -10)}</small></div>`
-    ).join('');
+    const container = document.getElementById('messages');
+    container.replaceChildren();
+    for (const m of messages) {
+        const div = document.createElement('div');
+        const b = document.createElement('b');
+        b.textContent = m.blud || '???';
+        const txt = document.createTextNode(': ');
+        const span = document.createElement('span');
+        span.textContent = m.lol;
+        const small = document.createElement('small');
+        small.style.color = '#8c8c8c';
+        small.textContent = ' ' + formatITS(m.time).slice(0, -10);
+        div.append(b, txt, span, small);
+        container.appendChild(div);
+    }
 }
 
 document.getElementById('messageForm').addEventListener('submit', async e => {
