@@ -116,7 +116,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Fucked up to target static dir: %v", err)
 	}
-	http.Handle("/", http.FileServer(http.FS(sub)))
+	http.Handle("/", imageCache(http.FileServer(http.FS(sub))))
 
 	log.Fatal(http.ListenAndServe("127.0.0.1:911", nil))
 }
@@ -225,6 +225,23 @@ func (rl *rateLimiter) allow(ip string) bool {
 
 	rl.requests[ip] = append(ts, now)
 	return true
+}
+
+func imageCache(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if isImage(r.URL.Path) {
+			w.Header().Set("Cache-Control", "public, max-age=604800, immutable")
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+func isImage(path string) bool {
+	switch strings.ToLower(filepath.Ext(path)) {
+	case ".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg", ".ico", ".avif":
+		return true
+	}
+	return false
 }
 
 func clientIP(r *http.Request) string {
