@@ -1,3 +1,4 @@
+> Open your editor. Do anything. Learn anything. Become anyone.
 # 😈 About Me:
 <br>💀🥒Goofy experimenter<br>🔪🪟Permanent linux user<br>🤝💦Also permanent virgin<br>🐧♿Was distrohopping 3 years straight<br>♂️😳Male<br>🇷🇺🔞Russian hacker
 
