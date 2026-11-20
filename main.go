@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"embed"
 	"encoding/json"
+	"fmt"
 	"io/fs"
 	"log"
 	"math/big"
@@ -12,7 +13,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -38,75 +38,32 @@ type Entry struct {
 //go:embed static
 var staticFS embed.FS
 
-const epochUnix = 1782086400.0
-
-var (
-	epochStartNs *big.Int
-	origCwd      string
-)
-
-func itsDir() string {
-	if d := os.Getenv("ITS_DIR"); d != "" {
-		return d
+func itsLink() string {
+	if v := os.Getenv("OFFSET_LINK"); v != "" {
+		return strings.TrimRight(v, "/")
 	}
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return "."
-	}
-	return filepath.Join(home, "its")
+	return "http://127.0.0.1:8080"
 }
 
-func init() {
-	log.Println("loading finals.all")
-	loadFinals(filepath.Join(itsDir(), "finals.all"))
-	buildSpline()
-
-	log.Println("reading offset.dat + nightfall date")
-	origCwd, _ = os.Getwd()
-	if err := os.Chdir(itsDir()); err != nil {
-		log.Fatal(err)
-	}
-	offsetLink := os.Getenv("OFFSET_LINK")
-	if offsetLink == "" {
-		offsetLink = "http://127.0.0.1:8080"
-	}
-	resp, err := http.Get(strings.TrimRight(offsetLink, "/") + "/api/offset")
+func calculateNsecs() (*big.Int, error) {
+	resp, err := http.Get(itsLink() + "/api/nsecs")
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 	defer resp.Body.Close()
+
 	var payload struct {
-		Offset string `json:"offset"`
+		Nsecs string `json:"nsecs"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
-	offset, err := strconv.ParseFloat(payload.Offset, 64)
-	if err != nil {
-		log.Fatal(err)
+
+	nsecs, ok := new(big.Int).SetString(payload.Nsecs, 10)
+	if !ok {
+		return nil, fmt.Errorf("bad nsecs: %q", payload.Nsecs)
 	}
-	ey, em, ed, _ := computeEarliestNight()
-	nightMJD := jdn(ey, em, ed) - 2400000.5
-	nightDUT1 := interpolateDUT1Spline(nightMJD)
-
-	epochStartNs = new(big.Int).SetInt64(int64(epochUnix))
-	epochStartNs.Mul(epochStartNs, big.NewInt(1e9))
-	epochStartNs.Add(epochStartNs, big.NewInt(int64(nightDUT1*1e9)))
-	epochStartNs.Add(epochStartNs, big.NewInt(int64(offset*1e9)))
-
-	log.Println("oh yes")
-}
-
-func calculateNsecs() *big.Int {
-	now := time.Now()
-	nowDUT1 := interpolateDUT1Spline(mjdFromUnix(now.Unix()))
-
-	nowNs := new(big.Int).SetInt64(now.Unix())
-	nowNs.Mul(nowNs, big.NewInt(1e9))
-	nowNs.Add(nowNs, big.NewInt(int64(now.Nanosecond())))
-	nowNs.Add(nowNs, big.NewInt(int64(nowDUT1*1e9)))
-
-	return new(big.Int).Sub(nowNs, epochStartNs)
+	return nsecs, nil
 }
 
 func main() {
@@ -193,7 +150,13 @@ func handleMessages(db* sql.DB) http.HandlerFunc {
 				return
 			}
 
-			_, err := db.ExecContext(ctx, "INSERT INTO chat (blud, lol, created_at) VALUES (?, ?, ?)", e.Blud, e.Lol, calculateNsecs().Int64())
+			nsecs, err := calculateNsecs()
+			if err != nil {
+				http.Error(w, "its-site unavailable", http.StatusBadGateway)
+				return
+			}
+
+			_, err = db.ExecContext(ctx, "INSERT INTO chat (blud, lol, created_at) VALUES (?, ?, ?)", e.Blud, e.Lol, nsecs.Int64())
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
