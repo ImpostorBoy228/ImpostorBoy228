@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -65,7 +66,25 @@ func init() {
 	if err := os.Chdir(itsDir()); err != nil {
 		log.Fatal(err)
 	}
-	offset := getOffset()
+	offsetLink := os.Getenv("OFFSET_LINK")
+	if offsetLink == "" {
+		offsetLink = "http://127.0.0.1:8080"
+	}
+	resp, err := http.Get(strings.TrimRight(offsetLink, "/") + "/api/offset")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer resp.Body.Close()
+	var payload struct {
+		Offset string `json:"offset"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+		log.Fatal(err)
+	}
+	offset, err := strconv.ParseFloat(payload.Offset, 64)
+	if err != nil {
+		log.Fatal(err)
+	}
 	ey, em, ed, _ := computeEarliestNight()
 	nightMJD := jdn(ey, em, ed) - 2400000.5
 	nightDUT1 := interpolateDUT1Spline(nightMJD)
