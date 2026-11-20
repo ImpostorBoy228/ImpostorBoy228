@@ -112,7 +112,7 @@ func handleMessages(db* sql.DB) http.HandlerFunc {
 			}
 			defer rows.Close()
 
-			var entries []Entry
+			entries := []Entry{}
 			for rows.Next() {
 				var e Entry
 				var t int64
