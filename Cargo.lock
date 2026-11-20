@@ -7,7 +7,6 @@ name = "ImpostorBoy228"
 version = "0.1.0"
 dependencies = [
  "axum",
- "its-rs",
  "reqwest",
  "serde",
  "serde_json",
@@ -701,12 +700,6 @@ name = "itoa"
 version = "1.0.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3bd1574e617a9a6c1f8f8181bd7e841e1f20e4277607ef28945765188d6284d4"
-
-[[package]]
-name = "its-rs"
-version = "0.1.101"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "da2a9b5a656c0d1199d151416340e45edc1f263932f666782fde78ab3a188eb4"
 
 [[package]]
 name = "js-sys"

@@ -3,7 +3,7 @@ use std::sync::Arc;
 use axum::{
     Json, Router,
     body::{Body, to_bytes},
-    extract::{State, connect_info::IntoMakeServiceWithConnectInfo},
+    extract::State,
     http::StatusCode,
     response::{IntoResponse, Response},
     routing::get,
@@ -36,9 +36,10 @@ struct Entry {
     time: String,
 }
 
-#[derive(Deserialize)]
-struct GetG {
-    since: u64,
+#[derive(Deserialize, Default)]
+struct GetR {
+    #[serde(default)]
+    since: Option<String>,
 }
 
 async fn get_messages(
@@ -47,48 +48,44 @@ async fn get_messages(
 ) -> Result<Json<Vec<Entry>>, AppError> {
     let bytes = to_bytes(body, 4096)
         .await
-        .map_err(|_| AppError(StatusCode::BAD_REQUEST, "Invalid JSON".into()))?;
+        .map_err(|_| AppError(StatusCode::BAD_REQUEST, "Invalid body".into()))?;
 
-    let input: Option<GetR> = serde_json::from_slice(&bytes)
-        .map_err(|_| AppError(StatusCode::BAD_REQUEST, "Invalid JSON".into()))?;
-    let input = input.unwrap_or_default();
-    let since = input.since.unwrap_ot_default();
-    if scince.is_empty() {
-        let rows =
-            sqlx::query_as::<_, (String, String, i64)>("SELECT blud, lol, created_at FROM chat")
-                .fetch_all(&state.db)
-                .await
-                .map_err(|e| AppError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-
-        let entries = rows
-            .into_iter()
-            .map(|(blud, lol, time)| Entry {
-                blud,
-                lol,
-                time: time.to_string(),
-            })
-            .collect();
-
-        Ok(Json(entries))
+    let input: GetR = if bytes.is_empty() {
+        GetR::default()
     } else {
-        let rows = sqlx::query_as::<_, (String, String, i64)>(&format!(
-            "SELECT blud, lol, created_at FROM chat WHERE created_at > {}",
-            since
-        ))
+        serde_json::from_slice(&bytes)
+            .map_err(|_| AppError(StatusCode::BAD_REQUEST, "Invalid JSON".into()))?
+    };
+    let since = input.since.unwrap_or_default();
+
+    let rows = if since.is_empty() {
+        sqlx::query_as::<_, (String, String, i64)>("SELECT blud, lol, created_at FROM chat")
+            .fetch_all(&state.db)
+            .await
+            .map_err(|e| AppError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+    } else {
+        let since: i64 = since
+            .parse()
+            .map_err(|_| AppError(StatusCode::BAD_REQUEST, "Invalid since".into()))?;
+        sqlx::query_as::<_, (String, String, i64)>(
+            "SELECT blud, lol, created_at FROM chat WHERE created_at > ?",
+        )
+        .bind(since)
         .fetch_all(&state.db)
         .await
-        .map_err(|e| AppError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-        let entries = rows
-            .into_iter()
-            .map(|(blud, lol, time)| Entry {
-                blud,
-                lol,
-                time: time.to_string(),
-            })
-            .collect();
+        .map_err(|e| AppError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+    };
 
-        Ok(Json(entries))
-    }
+    let entries = rows
+        .into_iter()
+        .map(|(blud, lol, time)| Entry {
+            blud,
+            lol,
+            time: time.to_string(),
+        })
+        .collect();
+
+    Ok(Json(entries))
 }
 
 #[derive(Default, Deserialize)]

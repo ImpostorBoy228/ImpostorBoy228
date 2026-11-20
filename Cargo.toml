@@ -5,7 +5,6 @@ edition = "2024"
 
 [dependencies]
 axum = "0.8.9"
-its-rs = "0.1.101"
 tokio = { version = "1.54.1", features = ["full"] }
 sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "sqlite"] }
 serde = { version = "1", features = ["derive"] }
