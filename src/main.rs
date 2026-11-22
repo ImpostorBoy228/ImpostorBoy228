@@ -17,11 +17,6 @@ use sqlx::{
 };
 use tower_http::services::ServeDir;
 
-struct AppState {
-    db: SqlitePool,
-    http: reqwest::Client,
-}
-
 #[derive(Debug)]
 struct AppError(StatusCode, String);
 
@@ -32,7 +27,7 @@ impl IntoResponse for AppError {
 }
 
 /// =======BEGIN ROUTES========
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 struct Entry {
     blud: String,
     lol: String,
@@ -158,6 +153,11 @@ async fn calculate_nsecs(client: &reqwest::Client) -> Result<i64, ()> {
 
 async fn method_not_allowed() -> Response {
     (StatusCode::METHOD_NOT_ALLOWED, "Method not allowed\n").into_response()
+}
+
+struct AppState {
+    db: SqlitePool,
+    http: reqwest::Client,
 }
 
 /// ========BEGIN MAIN==========
