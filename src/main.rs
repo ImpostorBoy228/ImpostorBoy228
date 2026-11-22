@@ -6,15 +6,19 @@ use axum::{
     Json, Router,
     body::{Body, to_bytes},
     extract::State,
+    extract::ws::{Message, Utf8Bytes, WebSocket, WebSocketUpgrade},
     http::StatusCode,
     response::{IntoResponse, Response},
     routing::get,
 };
+use futures_util::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use sqlx::{
     SqlitePool,
     sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions},
 };
+use tokio::sync::broadcast;
+use tokio::sync::broadcast::error::RecvError;
 use tower_http::services::ServeDir;
 
 #[derive(Debug)]
@@ -129,11 +133,56 @@ async fn post_message(
         .await
         .map_err(|e| AppError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
+    let ws_payload = serde_json::to_string(&Entry {
+        blud: blud.clone(),
+        lol: lol.clone(),
+        time: nsecs.to_string(),
+    })
+    .map_err(|e| AppError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    let _ = state.tx.send(Utf8Bytes::from(ws_payload));
+
     Ok((
         StatusCode::CREATED,
         Json(serde_json::json!({ "status": "success" })),
     )
         .into_response())
+}
+
+async fn ws_handler(ws: WebSocketUpgrade, State(state): State<Arc<AppState>>) -> Response {
+    ws.on_upgrade(move |socket| handle_socket(socket, state))
+}
+
+async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
+    let (mut sender, mut receiver) = socket.split();
+    let mut rx = state.tx.subscribe();
+
+    let mut send_task = tokio::spawn(async move {
+        loop {
+            match rx.recv().await {
+                Ok(text) => {
+                    if sender.send(Message::Text(text)).await.is_err() {
+                        break;
+                    }
+                }
+                Err(RecvError::Lagged(skipped)) => {
+                    eprintln!("ws client lagged, skipped {skipped} messages");
+                }
+                Err(RecvError::Closed) => break,
+            }
+        }
+    });
+    let mut recv_task = tokio::spawn(async move {
+        while let Some(Ok(msg)) = receiver.next().await {
+            if let Message::Close(_) = msg {
+                break;
+            }
+        }
+    });
+    tokio::select! {
+        _ = &mut send_task => recv_task.abort(),
+        _ = &mut recv_task => send_task.abort(),
+    }
 }
 
 #[derive(Deserialize)]
@@ -158,11 +207,13 @@ async fn method_not_allowed() -> Response {
 struct AppState {
     db: SqlitePool,
     http: reqwest::Client,
+    tx: broadcast::Sender<Utf8Bytes>,
 }
 
 /// ========BEGIN MAIN==========
 #[tokio::main]
 async fn main() {
+    let (tx, _rx) = broadcast::channel(1024);
     let options = SqliteConnectOptions::new()
         .filename("AC.db")
         .create_if_missing(true)
@@ -191,10 +242,12 @@ async fn main() {
     let state = Arc::new(AppState {
         db,
         http: reqwest::Client::new(),
+        tx,
     });
 
     let app = Router::new()
         .route("/api/diddy_chat", get(get_messages).post(post_message))
+        .route("/ws", get(ws_handler))
         .method_not_allowed_fallback(method_not_allowed)
         .fallback_service(ServeDir::new("static"))
         .with_state(state);
@@ -235,6 +288,7 @@ mod tests {
         Arc::new(AppState {
             db,
             http: reqwest::Client::new(),
+            tx: tokio::sync::broadcast::channel(1024).0,
         })
     }
 
@@ -370,6 +424,7 @@ mod tests {
 
     #[tokio::test]
     async fn post_message_fails_without_nsecs_service() {
+        let _lock = ENV_LOCK.lock().unwrap();
         unsafe {
             std::env::set_var("OFFSET_LINK", "http://127.0.0.1:1");
         }
@@ -473,5 +528,102 @@ mod tests {
                 test::black_box(rows);
             })
         });
+    }
+
+    static ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+    use futures_util::StreamExt;
+    use tokio::net::TcpListener;
+    use tokio_tungstenite::connect_async;
+
+    async fn start_ws_server() -> (u16, Arc<AppState>) {
+        let state = test_state().await;
+        let app = Router::new()
+            .route("/ws", get(ws_handler))
+            .with_state(state.clone());
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        tokio::spawn(async move {
+            axum::serve(listener, app).await.unwrap();
+        });
+        (port, state)
+    }
+
+    #[tokio::test]
+    async fn ws_client_receives_broadcast() {
+        let (port, state) = start_ws_server().await;
+        let url = format!("ws://127.0.0.1:{}/ws", port);
+        let (mut ws_stream, _) = connect_async(url).await.unwrap();
+        let payload = r#"{"blud":"b","lol":"l","time":"42"}"#;
+        state
+            .tx
+            .send(axum::extract::ws::Utf8Bytes::from(payload.to_string()))
+            .unwrap();
+        let msg = ws_stream.next().await.unwrap().unwrap();
+        assert!(msg.is_text());
+        assert_eq!(msg.to_text().unwrap(), payload);
+    }
+
+    #[tokio::test]
+    async fn ws_client_receives_posted_message() {
+        let _lock = ENV_LOCK.lock().unwrap();
+        let mock_listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let mock_port = mock_listener.local_addr().unwrap().port();
+        let mock_app = Router::new().route(
+            "/api/nsecs",
+            get(|| async { Json(serde_json::json!({"nsecs":"42"})) }),
+        );
+        tokio::spawn(async move {
+            axum::serve(mock_listener, mock_app).await.unwrap();
+        });
+
+        unsafe {
+            std::env::set_var("OFFSET_LINK", format!("http://127.0.0.1:{}", mock_port));
+        }
+
+        let (port, state) = start_ws_server().await;
+        let url = format!("ws://127.0.0.1:{}/ws", port);
+        let (mut ws_stream, _) = connect_async(url).await.unwrap();
+
+        let body = Body::from(r#"{"blud":"b","lol":"l"}"#);
+        let resp = post_message(State(state), body).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::CREATED);
+
+        let msg = ws_stream.next().await.unwrap().unwrap();
+        assert!(msg.is_text());
+        let value: serde_json::Value = serde_json::from_str(msg.to_text().unwrap()).unwrap();
+        assert_eq!(value["blud"], "b");
+        assert_eq!(value["lol"], "l");
+        assert_eq!(value["time"], "42");
+    }
+
+    #[tokio::test]
+    async fn post_message_broadcasts_payload() {
+        let _lock = ENV_LOCK.lock().unwrap();
+        let mock_listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let mock_port = mock_listener.local_addr().unwrap().port();
+        let mock_app = Router::new().route(
+            "/api/nsecs",
+            get(|| async { Json(serde_json::json!({"nsecs":"42"})) }),
+        );
+        tokio::spawn(async move {
+            axum::serve(mock_listener, mock_app).await.unwrap();
+        });
+
+        unsafe {
+            std::env::set_var("OFFSET_LINK", format!("http://127.0.0.1:{}", mock_port));
+        }
+
+        let state = test_state().await;
+        let mut rx = state.tx.subscribe();
+        let body = Body::from(r#"{"blud":"b","lol":"l"}"#);
+        let resp = post_message(State(state), body).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::CREATED);
+
+        let msg = rx.recv().await.unwrap();
+        let value: serde_json::Value = serde_json::from_str(msg.as_str()).unwrap();
+        assert_eq!(value["blud"], "b");
+        assert_eq!(value["lol"], "l");
+        assert_eq!(value["time"], "42");
     }
 }
