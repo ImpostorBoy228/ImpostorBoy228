@@ -214,8 +214,16 @@ struct AppState {
 #[tokio::main]
 async fn main() {
     let (tx, _rx) = broadcast::channel(1024);
+
+    let db_path = std::env::var("DB_PATH").unwrap_or_else(|_| "AC.db".to_string());
+    if let Some(parent) = std::path::Path::new(&db_path).parent() {
+        if !parent.as_os_str().is_empty() {
+            std::fs::create_dir_all(parent).expect("Fucked up to create db directory");
+        }
+    }
+
     let options = SqliteConnectOptions::new()
-        .filename("AC.db")
+        .filename(&db_path)
         .create_if_missing(true)
         .journal_mode(SqliteJournalMode::Wal)
         .foreign_keys(true);
@@ -237,7 +245,7 @@ async fn main() {
     .await
     .expect("Fucked up to create table");
 
-    println!("DB initialized");
+    println!("DB initialized at {db_path}");
 
     let state = Arc::new(AppState {
         db,
@@ -252,11 +260,13 @@ async fn main() {
         .fallback_service(ServeDir::new("static"))
         .with_state(state);
 
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:911")
+    let bind_addr =
+        std::env::var("BIND_ADDR").unwrap_or_else(|_| "127.0.0.1:911".to_string());
+    let listener = tokio::net::TcpListener::bind(&bind_addr)
         .await
         .expect("Fucked up to bind");
 
-    println!("Listening on http://127.0.0.1:911");
+    println!("Listening on http://{bind_addr}");
 
     axum::serve(listener, app).await.expect("server error");
 }
