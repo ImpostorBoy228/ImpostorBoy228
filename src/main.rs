@@ -252,11 +252,11 @@ async fn main() {
         .fallback_service(ServeDir::new("static"))
         .with_state(state);
 
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:1060")
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:911")
         .await
         .expect("Fucked up to bind");
 
-    println!("Listening on http://127.0.0.1:1060");
+    println!("Listening on http://127.0.0.1:911");
 
     axum::serve(listener, app).await.expect("server error");
 }
